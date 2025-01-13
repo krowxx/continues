@@ -10,6 +10,7 @@ import {
   ContextItemWithId,
   ContextProviderDescription,
   InputModifiers,
+  MessageContent,
   RangeInFile,
 } from "core";
 import { modelSupportsImages } from "core/llm/autodetect";
@@ -70,6 +71,9 @@ import {
   selectHasCodeToEdit,
   selectIsInEditMode,
   setMainEditorContentTrigger,
+  setIsGatheringContext,
+  updateHistoryItemAtIndex,
+  submitEditorAndInitAtIndex,
 } from "../../redux/slices/sessionSlice";
 import { exitEditMode } from "../../redux/thunks";
 import {
@@ -77,6 +81,7 @@ import {
   loadSession,
   saveCurrentSession,
 } from "../../redux/thunks/session";
+import { gatherContext } from "../../redux/thunks";
 
 const InputBoxDiv = styled.div<{ border?: string }>`
   resize: none;
@@ -915,6 +920,63 @@ function TipTapEditor(props: TipTapEditorProps) {
     [editor],
   );
 
+  const handleGatherContext = async () => {
+    const json = editor.getJSON();
+
+    // Don't do anything if input box is empty
+    if (!json.content?.some((c) => c.content)) {
+      return;
+    }
+
+    // Set gathering context state and update UI
+    dispatch(submitEditorAndInitAtIndex({ editorState: json }));
+    dispatch(setIsGatheringContext(true));
+
+    const result = await dispatch(gatherContext({
+      editorState: json,
+      modifiers: {
+        useCodebase: true,
+        noContext: !useActiveFile,
+      }
+    }));
+    
+    const payload = result.payload as {
+      selectedContextItems: ContextItemWithId[];
+      selectedCode: RangeInFile[];
+      content: MessageContent;
+    };
+    
+    if (payload?.selectedContextItems) {
+      // Update the history item with the context
+      dispatch(
+        updateHistoryItemAtIndex({
+          index: historyLength,
+          updates: {
+            message: {
+              role: "user",
+              content: payload.content,
+              id: v4(),
+            },
+            contextItems: payload.selectedContextItems,
+          },
+        }),
+      );
+
+      // Filter out instructions and copy to clipboard
+      const contextItemsWithoutInstructions = payload.selectedContextItems.filter(
+        item => !item.name.toLowerCase().includes('instruction')
+      );
+      const contextStr = contextItemsWithoutInstructions
+        .map(item => `${item.name}\n${item.content}`)
+        .join('\n\n');
+      await navigator.clipboard.writeText(contextStr);
+      ideMessenger.post("showToast", ["info", "Context copied to clipboard"]);
+    }
+
+    // Reset gathering context state
+    dispatch(setIsGatheringContext(false));
+  };
+
   return (
     <InputBoxDiv
       border={props.border}
@@ -977,6 +1039,7 @@ function TipTapEditor(props: TipTapEditorProps) {
           onAddContextItem={() => insertCharacterWithWhitespace("@")}
           onAddSlashCommand={() => insertCharacterWithWhitespace("/")}
           onEnter={onEnterRef.current}
+          onGatherContext={handleGatherContext}
           onImageFileSelected={(file) => {
             handleImageFile(file).then(([img, dataUrl]) => {
               const { schema } = editor.state;

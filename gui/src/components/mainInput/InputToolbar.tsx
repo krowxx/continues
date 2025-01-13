@@ -76,6 +76,7 @@ interface InputToolbarProps {
   onAddSlashCommand?: () => void;
   onClick?: () => void;
   onImageFileSelected?: (file: File) => void;
+  onGatherContext?: () => void;
   hidden?: boolean;
   activeKey: string | null;
   toolbarOptions?: ToolbarOptions;
@@ -160,33 +161,47 @@ function InputToolbar(props: InputToolbarProps) {
 
         <div className="flex items-center gap-2 whitespace-nowrap text-gray-400">
           {props.toolbarOptions?.hideUseCodebase || (
-            <div
-              className={`${shouldRenderToolsButton ? "md:flex" : "sm:flex"} hover:underline" hidden transition-colors duration-200`}
-            >
-              {props.activeKey === "Alt" ? (
-                <HoverItem className="underline">
-                  {`${getAltKeyLabel()}⏎
-                  ${useActiveFile ? "No active file" : "Active file"}`}
-                </HoverItem>
-              ) : (
-                <HoverItem
-                  className={props.activeKey === "Meta" ? "underline" : ""}
-                  onClick={(e) =>
-                    props.onEnter?.({
-                      useCodebase: true,
-                      noContext: !useActiveFile,
-                    })
-                  }
-                >
-                  <span data-tooltip-id="add-codebase-context-tooltip">
-                    {getMetaKeyLabel()}⏎ @codebase
-                  </span>
-                  <ToolTip id="add-codebase-context-tooltip" place="top-end">
-                    Submit with the codebase as context ({getMetaKeyLabel()}⏎)
-                  </ToolTip>
-                </HoverItem>
-              )}
-            </div>
+            <>
+              <div
+                className={`${shouldRenderToolsButton ? "md:flex" : "sm:flex"} hover:underline" hidden transition-colors duration-200`}
+              >
+                {props.activeKey === "Alt" ? (
+                  <HoverItem className="underline">
+                    {`${getAltKeyLabel()}⏎
+                    ${useActiveFile ? "No active file" : "Active file"}`}
+                  </HoverItem>
+                ) : (
+                  <HoverItem
+                    className={props.activeKey === "Meta" ? "underline" : ""}
+                    onClick={(e) =>
+                      props.onEnter?.({
+                        useCodebase: true,
+                        noContext: !useActiveFile,
+                      })
+                    }
+                  >
+                    <span data-tooltip-id="add-codebase-context-tooltip">
+                      {getMetaKeyLabel()}⏎ @codebase
+                    </span>
+                    <ToolTip id="add-codebase-context-tooltip" place="top-end">
+                      Submit with the codebase as context ({getMetaKeyLabel()}⏎)
+                    </ToolTip>
+                  </HoverItem>
+                )}
+              </div>
+
+              <HoverItem
+                onClick={props.onGatherContext}
+                className="flex hover:underline"
+              >
+                <span data-tooltip-id="gather-context-tooltip">
+                  Copy Context
+                </span>
+                <ToolTip id="gather-context-tooltip" place="top-end">
+                  Gather context without submitting
+                </ToolTip>
+              </HoverItem>
+            </>
           )}
 
           {isInEditMode && (
